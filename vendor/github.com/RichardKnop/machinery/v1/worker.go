@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/RichardKnop/machinery/v1/backends/amqp"
+	"github.com/RichardKnop/machinery/v1/brokers/errs"
 	"github.com/RichardKnop/machinery/v1/log"
 	"github.com/RichardKnop/machinery/v1/retry"
 	"github.com/RichardKnop/machinery/v1/tasks"
@@ -135,7 +136,7 @@ func (worker *Worker) Process(signature *tasks.Signature) error {
 	}
 
 	// Prepare task for processing
-	task, err := tasks.New(taskFunc, signature.Args)
+	task, err := tasks.NewWithSignature(taskFunc, signature)
 	// if this failed, it means the task is malformed, probably has invalid
 	// signature, go directly to task failed without checking whether to retry
 	if err != nil {
@@ -360,6 +361,10 @@ func (worker *Worker) taskFailed(signature *tasks.Signature, taskErr error) erro
 		}}, errorTask.Args...)
 		errorTask.Args = args
 		worker.server.SendTask(errorTask)
+	}
+
+	if signature.StopTaskDeletionOnError {
+		return errs.ErrStopTaskDeletion
 	}
 
 	return nil
